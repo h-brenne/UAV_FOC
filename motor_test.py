@@ -10,7 +10,11 @@ import moteus
 
 class Motor_tester:
     def __init__(self):
-        self.controller = moteus.Controller()
+        qr = moteus.QueryResolution()
+        # Query current
+        qr.q_current = moteus.F32
+        qr.d_current = moteus.F32
+        self.controller = moteus.Controller(query_resolution=qr)
         self.stream = moteus.Stream(self.controller)
         self.motor_action = {
             'position': math.nan,
