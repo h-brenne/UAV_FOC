@@ -44,17 +44,22 @@ class Motor_tester:
         await self.stream.command(b'd stop')
    
 async def main(motor):
-    test_name = "test5"
+    test_name = "normal_prop_20rpm_10A"
     await motor.init_driver()
     
     data = []
 
     motor_position = 0
-    base_frequency = 20
+    base_frequency = -20
     amplitude = 10
+
+    await asyncio.sleep(5) #Get in cover
+
+
+
     t0 = time.time()
     t = 0
-    while t<1:
+    while t<5:
         t = time.time() - t0
 
         sine_wave = amplitude*math.sin(motor_position)
@@ -82,6 +87,5 @@ if __name__ == '__main__':
         loop.run_until_complete(task)
     finally:
         task.cancel()
-        loop.run_forever
         loop.run_until_complete(motor.stop_motor_driver())
     
