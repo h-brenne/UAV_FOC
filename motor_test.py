@@ -126,46 +126,30 @@ async def sinusoidal_test(motor):
         pickle.dump(data, f)
 async def sinusoidal_multi_test(motor):
     timestr = datetime.now().strftime("%Y-%d-%m_%H-%M-%S")
-    test_name = "logs/sinusoidal_multi_test_hinged_prop" + timestr
+    test_name = "logs/MN5006/800hz_force/2/sinusoudal_multi_test" + timestr
     await motor.init_driver()
     await motor.soft_start()
     
     data = []
 
-    base_frequency = 10
+    base_frequency = 20
     amplitude = 0
     angle = 0
 
     t0 = time.monotonic()
     t = 0
-    while t<16:
+    while t<12:
         t = time.monotonic() - t0
         if t > 2:
-            base_frequency = 20
-            amplitude = 0
+            amplitude = 0.2*base_frequency
             angle = 0
         if t > 4:
-            base_frequency = 20
-            amplitude = base_frequency*0.2
-            angle = 0
-        if t > 6:
-            base_frequency = 20
-            amplitude = base_frequency*0.2
             angle = math.pi/2
-        if t > 8:
-            base_frequency = 20
-            amplitude = base_frequency*0.2
+        if t > 6:
             angle = math.pi
+        if t > 8:
+            angle = 3*math.pi/2
         if t > 10:
-            base_frequency = 20
-            amplitude = base_frequency*0.2
-            angle = 3*math.pi/2
-        if t > 12:
-            base_frequency = 20 + (t-12)*5
-            amplitude = base_frequency*0.2
-            angle = 3*math.pi/2
-        if t > 14:
-            base_frequency = 20
             amplitude = 0
             angle = 0
 
@@ -181,7 +165,7 @@ if __name__ == '__main__':
     loop = asyncio.new_event_loop()
     motor = Motor_tester()
 
-    task = loop.create_task(sinusoidal_multi_test(motor))
+    task = loop.create_task(sinusoidal_test(motor))
     try: 
         loop.run_until_complete(task)
     finally:
