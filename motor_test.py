@@ -117,7 +117,7 @@ async def sinusoidal_test(motor):
     while t<4:
         t = time.monotonic() - t0
 
-        sine_wave = amplitude*math.sin(motor.motor_position+angle)
+        sine_wave = amplitude*math.cos(motor.motor_position+angle)
         motor.motor_action["velocity"] = base_frequency + sine_wave
         motor_telem = await motor.command_motor()
  
@@ -169,7 +169,7 @@ async def sinusoidal_multi_test(motor):
             amplitude = 0
             angle = 0
 
-        sine_wave = amplitude*math.sin(motor.motor_position+angle)
+        sine_wave = amplitude*math.cos(motor.motor_position+angle)
         motor.motor_action["velocity"] = base_frequency + sine_wave
         motor_telem = await motor.command_motor()
  
