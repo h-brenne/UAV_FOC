@@ -19,9 +19,9 @@ class Motor_tester:
         self.motor_action = {
             'position': math.nan,
             'velocity': 0,
-            'maximum_torque': 1,
+            'maximum_torque': 3,
             'stop_position': math.nan,
-            'accel_limit': math.nan
+            'accel_limit': 100
         }
 
         
@@ -42,27 +42,68 @@ class Motor_tester:
         await self.controller.set_stop()
         #time.sleep(2)
         await self.stream.command(b'd stop')
-   
-async def main(motor):
-    test_name = "normal_prop_20rpm_10A"
+
+async def constant_test(motor):
+    test_name = "logs/MN5006/hinge2/40Hz"
     await motor.init_driver()
     
     data = []
 
     motor_position = 0
-    base_frequency = -20
-    amplitude = 10
+    base_frequency = 40
+    amplitude = 0
 
-    await asyncio.sleep(5) #Get in cover
+    await asyncio.sleep(10) #Get in cover
+    t0 = time.time()
+    t = 0
+    while t<4:
+        t = time.time() - t0
+
+        if t > 2:
+            motor.motor_action["accel_limit"] = math.nan
+            amplitude = 0
+
+        sine_wave = amplitude*math.sin(motor_position)
+        motor.motor_action["velocity"] = base_frequency + sine_wave
+        
+        motor_telem = await motor.command_motor()
+        
+        # No way to get non-accumulated rotor position
+        motor_position = (motor_telem.values[moteus.Register.POSITION])*2*math.pi 
+        
+        data.append([motor_telem, motor.motor_action["velocity"], t])
+    with open(test_name, 'wb') as f:
+        pickle.dump(data, f)
+
+async def multisequence(motor):
+    test_name = "logs/MN5006/hinge2/40Hz10A_multisequence"
+    await motor.init_driver()
+    
+    data = []
+
+    motor_position = 0
+    base_frequency = 40
+    amplitude = 0
+
+    await asyncio.sleep(10) #Get in cover
 
 
 
     t0 = time.time()
     t = 0
-    while t<5:
+    while t<12:
         t = time.time() - t0
 
-        sine_wave = amplitude*math.sin(motor_position)
+        if t > 2:
+            motor.motor_action["accel_limit"] = math.nan
+            amplitude = 10
+        if t > 4:
+            amplitude = -10
+        if t > 6:
+            sine_wave = amplitude*math.sin(motor_position+(t-6)*(2*math.pi)/2)
+        else:
+            sine_wave = amplitude*math.sin(motor_position)
+
         motor.motor_action["velocity"] = base_frequency + sine_wave
         
         motor_telem = await motor.command_motor()
@@ -82,7 +123,7 @@ if __name__ == '__main__':
     loop = asyncio.new_event_loop()
     motor = Motor_tester()
 
-    task = loop.create_task(main(motor))
+    task = loop.create_task(multisequence(motor))
     try: 
         loop.run_until_complete(task)
     finally:
