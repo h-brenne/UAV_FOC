@@ -57,6 +57,24 @@ class Motor_tester:
         self.motor_action["accel_limit"] = math.nan
         return data
 
+async def constant_velocity_test(motor):
+    timestr = datetime.now().strftime("%Y-%d-%m_%H-%M-%S")
+    test_name = "logs/constant_velocity_hinged_prop_" + timestr
+    data = []
+    await motor.init_driver()
+    await motor.soft_start()
+    
+    motor.motor_action["velocity"] = 10
+    t0 = time.monotonic()
+    t = 0
+    while t<3:
+        t = time.monotonic() - t0
+        motor_telem = await motor.command_motor()
+        data.append([motor_telem, motor.motor_action["velocity"], t])
+
+    with open(test_name, 'wb') as f:
+        pickle.dump(data, f)
+
 async def constant_velocities_tests(motor):
     timestr = datetime.now().strftime("%Y-%d-%m_%H-%M-%S")
     test_name = "logs/soft_start_test_" + timestr
@@ -84,14 +102,14 @@ async def constant_velocities_tests(motor):
 
 async def sinusoidal_test(motor):
     timestr = datetime.now().strftime("%Y-%d-%m_%H-%M-%S")
-    test_name = "logs/sinusoidal_test_" + timestr
+    test_name = "logs/sinusoidal_test_hinged_prop_" + timestr
     await motor.init_driver()
     await motor.soft_start()
     
     data = []
 
-    base_frequency = 30
-    amplitude = 10
+    base_frequency = 20
+    amplitude = 4
     angle = 0
 
     t0 = time.monotonic()
@@ -103,12 +121,12 @@ async def sinusoidal_test(motor):
         motor.motor_action["velocity"] = base_frequency + sine_wave
         motor_telem = await motor.command_motor()
  
-        data.append([motor_telem, motor.motor_action["velocity"], t])
+        data.append([motor_telem, motor.motor_action["velocity"], t, angle])
     with open(test_name, 'wb') as f:
         pickle.dump(data, f)
 async def sinusoidal_multi_test(motor):
     timestr = datetime.now().strftime("%Y-%d-%m_%H-%M-%S")
-    test_name = "logs/sinusoidal_multi_test_" + timestr
+    test_name = "logs/sinusoidal_multi_test_hinged_prop" + timestr
     await motor.init_driver()
     await motor.soft_start()
     
@@ -123,31 +141,31 @@ async def sinusoidal_multi_test(motor):
     while t<16:
         t = time.monotonic() - t0
         if t > 2:
-            base_frequency = 30
+            base_frequency = 20
             amplitude = 0
             angle = 0
         if t > 4:
-            base_frequency = 30
+            base_frequency = 20
             amplitude = base_frequency*0.2
             angle = 0
         if t > 6:
-            base_frequency = 30
+            base_frequency = 20
             amplitude = base_frequency*0.2
             angle = math.pi/2
         if t > 8:
-            base_frequency = 30
+            base_frequency = 20
             amplitude = base_frequency*0.2
             angle = math.pi
         if t > 10:
-            base_frequency = 30
+            base_frequency = 20
             amplitude = base_frequency*0.2
             angle = 3*math.pi/2
         if t > 12:
-            base_frequency = 30 + (t-12)*10
+            base_frequency = 20 + (t-12)*5
             amplitude = base_frequency*0.2
             angle = 3*math.pi/2
         if t > 14:
-            base_frequency = 50
+            base_frequency = 20
             amplitude = 0
             angle = 0
 
@@ -155,7 +173,7 @@ async def sinusoidal_multi_test(motor):
         motor.motor_action["velocity"] = base_frequency + sine_wave
         motor_telem = await motor.command_motor()
  
-        data.append([motor_telem, motor.motor_action["velocity"], t])
+        data.append([motor_telem, motor.motor_action["velocity"], t, angle])
     with open(test_name, 'wb') as f:
         pickle.dump(data, f)
 
