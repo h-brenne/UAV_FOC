@@ -64,11 +64,11 @@ async def constant_velocity_test(motor):
     await motor.init_driver()
     await motor.soft_start()
     
-    motor.motor_action["velocity"] = 10
-    t0 = time.monotonic()
+    motor.motor_action["velocity"] = 20
+    t0 = time.time()
     t = 0
     while t<3:
-        t = time.monotonic() - t0
+        t = time.time() - t0
         motor_telem = await motor.command_motor()
         data.append([motor_telem, motor.motor_action["velocity"], t])
 
@@ -165,7 +165,7 @@ if __name__ == '__main__':
     loop = asyncio.new_event_loop()
     motor = Motor_tester()
 
-    task = loop.create_task(sinusoidal_test(motor))
+    task = loop.create_task(constant_velocity_test(motor))
     try: 
         loop.run_until_complete(task)
     finally:
