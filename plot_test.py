@@ -9,7 +9,7 @@ from scipy import signal
 
 plt.rcParams["figure.figsize"] = (10,5)
 
-save_plot = True
+save_plot = False
 plot_angles = True
 plot_force_sensor = True
 plot_imu = True
@@ -32,9 +32,11 @@ if plot_force_sensor:
     thrust_phi_angle = 180+(180/math.pi)*np.arctan2(force_df_smooth["Force Y (N)"],force_df_smooth["Force X (N)"])
     thrust_theta_angle = (180/math.pi)*np.arctan2(np.sqrt(force_df_smooth["Force X (N)"]**2+force_df_smooth["Force Y (N)"]**2), force_df_smooth["Force Z (N)"])
     
+    sum_of_force = force_df["Force X (N)"].to_numpy()+force_df["Force Y (N)"].to_numpy()+force_df["Force Z (N)"].to_numpy()
+    sum_of_torque = force_df["Torque X (N-m)"].to_numpy() + force_df["Torque Y (N-m)"].to_numpy()+ force_df["Torque Z (N-m)"].to_numpy()
     if plot_fft:
         #FFT analysis
-        force_fft = scipy.fftpack.rfft(force_df["Force X (N)"].to_numpy())/num_samples
+        force_fft = scipy.fftpack.rfft(sum_of_force)/num_samples
         #force_fft = force_fft[len(force_fft)//2:]
         #force_freq_timesteps = np.linspace(0, 0.5*data_hz, num_samples//2)
         force_freq_timesteps = scipy.fftpack.rfftfreq(num_samples, 1/data_hz)
@@ -47,11 +49,12 @@ if plot_imu:
     imu_timesteps = df_imu["TimeStartup"]
     num_imu_samples = len(imu_timesteps)
     imu_timesteps = (imu_timesteps - imu_timesteps[0])*10e-10
+    sum_of_gyro = df_imu["GyroX"].to_numpy()+df_imu["GyroY"].to_numpy()+df_imu["GyroZ"].to_numpy()
+    sum_of_imu_accel = df_imu["AccelX"].to_numpy()+df_imu["AccelY"].to_numpy()+df_imu["AccelZ"].to_numpy()
     if plot_fft:
         #FFT analysis. Real signal will produce symmetric FT along x-axis, plot positve part
         imu_freq_timesteps = np.linspace(0, 0.5*imu_data_hz, num_imu_samples//2)
-        imu_fft = scipy.fftpack.rfft(df_imu["GyroX"].to_numpy())/num_imu_samples
-        #imu_fft = imu_fft[len(imu_fft)//2:]
+        imu_fft = scipy.fftpack.rfft(sum_of_imu_accel)/num_imu_samples
         imu_freq_timesteps = scipy.fftpack.rfftfreq(num_imu_samples, 1/imu_data_hz)
     if plot_stft:
         imu_stft_f, imu_stft_t, imu_stft_zxx = scipy.signal.stft(df_imu["GyroX"].to_numpy(), imu_data_hz, nperseg=1600)
@@ -135,19 +138,19 @@ if plot_imu or plot_force_sensor:
     plt.legend()
 if plot_stft:
     fig = plt.figure()
-    plt.title("Spectogram of gyroscope x-axis")
+    plt.title("Spectogram of sum of imu x,y,z accelerations")
     #ax = fig.gca(projection='3d')
     #plt.pcolormesh(imu_stft_t, imu_stft_f, np.abs(imu_stft_zxx))
     #ax.plot_surface(imu_stft_t[None, :], imu_stft_f[:, None], 20*np.log10(np.abs(imu_stft_zxx)), cmap='viridis')
-    _,_,_,cax = plt.specgram(df_imu["GyroX"].to_numpy(), NFFT=800, Fs=imu_data_hz)
+    _,_,_,cax = plt.specgram(sum_of_imu_accel, NFFT=800, Fs=imu_data_hz)
     fig.colorbar(cax).set_label('Intensity [dB]')
     plt.xlabel("Seconds")
     plt.ylabel("Frequency")
     fig = plt.figure()
-    plt.title("Spectogram of x-axis force")
+    plt.title("Spectogram of sum of x,y,z forces")
     #ax = fig.gca(projection='3d')
     #ax.plot_surface(force_stft_t[None, :], force_stft_f[:, None], np.abs(force_stft_zxx), cmap='viridis')
-    _,_,_,cax = plt.specgram(force_df["Force X (N)"][int(data_hz*force_offset):int(force_offset*data_hz+experiment_length*data_hz)].to_numpy(), NFFT=500, Fs=data_hz)
+    _,_,_,cax = plt.specgram(sum_of_force[int(data_hz*force_offset):int(force_offset*data_hz+experiment_length*data_hz)], NFFT=500, Fs=data_hz)
     fig.colorbar(cax).set_label('Intensity [dB]')
     plt.xlabel("Seconds")
     plt.ylabel("Frequency")
