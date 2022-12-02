@@ -6,6 +6,8 @@ import pandas as pd
 import moteus
 import scipy.fftpack
 from scipy import signal
+from datetime import datetime
+import matplotlib.backends.backend_pdf
 
 plt.rcParams["figure.figsize"] = (10,5)
 
@@ -16,15 +18,20 @@ plot_imu = True
 plot_fft = True
 plot_stft = True
 
-title = "Amplitude steps from 0 to 25%"
+title = "Velocity sweep for 60rpm to 3600 rpm, 20% sinusoidal amplitude"
 folder = "logs/sinusoidal_multi_amplitude/60/"
-experiment_length = 24
-with open(folder + "2022-22-11_22-13-48", "rb") as f:
+time_str = "2022-22-11_22-13-48"
+start_time = datetime.strptime(time_str, "%Y-%d-%m_%H-%M-%S")
+experiment_length = 10
+
+with open(folder + time_str, "rb") as f:
     data = pickle.load(f)
 if plot_force_sensor:
     data_hz = 2000
-    force_offset = 5.1
     force_df = pd.read_csv(folder + "multi_amplitude60.csv")
+    force_start_time = datetime.strptime(
+        force_df.columns[-1][-19:], "%d/%m/%Y %H:%M:%S")
+    force_offset = (start_time-force_start_time).total_seconds() + 1.1
     force_df_smooth = force_df.ewm(span = 1500).mean()
     num_samples = len(force_df["Torque Z (N-m)"])
     force_timesteps = np.linspace(-force_offset,num_samples/data_hz-force_offset, num_samples)
@@ -125,14 +132,14 @@ if plot_force_sensor:
 if plot_imu or plot_force_sensor:
     plt.figure()
     plt.subplot(2,1,1)
-    plt.title("FFT of IMU and force sensor")
+    plt.title("FFT")
     if plot_imu:
-        plt.plot(imu_freq_timesteps, np.abs(imu_fft), label="Gyro X")
+        plt.plot(imu_freq_timesteps, np.abs(imu_fft), label="FFT of sum of IMU x,y,z accelerations")
         plt.ylabel("")
         plt.legend()
     if plot_force_sensor:
         plt.subplot(2,1,2)
-        plt.plot(force_freq_timesteps , np.abs(force_fft), label="Force X")
+        plt.plot(force_freq_timesteps , np.abs(force_fft), label="FFT of sum of x,y,z forces")
         plt.ylabel("")
     plt.xlabel("Frequency")
     plt.legend()
@@ -154,7 +161,11 @@ if plot_stft:
     fig.colorbar(cax).set_label('Intensity [dB]')
     plt.xlabel("Seconds")
     plt.ylabel("Frequency")
+    
 if save_plot:
+    pdf = matplotlib.backends.backend_pdf.PdfPages(folder + "output.pdf")
     for i in plt.get_fignums():
         plt.figure(i).savefig(folder + str(i) + '.png')
+        pdf.savefig(plt.figure(i))
+    pdf.close()
 plt.show()

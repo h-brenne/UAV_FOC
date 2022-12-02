@@ -9,7 +9,7 @@ from datetime import datetime
 import moteus
 
 class Motor_tester:
-    def __init__(self):
+    def __init__(self, mode):
         qr = moteus.QueryResolution()
         # Query current
         qr.q_current = moteus.F32
@@ -22,25 +22,67 @@ class Motor_tester:
             'maximum_torque': math.nan,
             'stop_position': math.nan,
             'accel_limit': math.nan,
-            'feedforward_torque': None
+            'feedforward_torque': None,
+            'sinusoidal': 0
         }
         self.motor_position = 0
+        self.motor_velocity = 0
+        if mode is "velocity" or "torque" or "voltage": 
+            self.mode = mode
+        else:
+            raise Exception("Invalid mode")
+
+        #Custom PI
+        self.Kp = 0.017
+        self.Ki = 0.00005
+        self.vel_cumulative_error = 0
+        
         
     async def init_driver(self):
         # In case the controller had faulted previously, at the start of
         # this script we send the stop command in order to clear it.
         await self.controller.set_stop()
+        if self.mode == "velocity":
+            await self.stream.command(b'conf set servo.voltage_mode_control 0.00')
+            await self.stream.command(b'conf set servo.pid_position.kp 0.02')
+            await self.stream.command(b'conf set servo.pid_position.ki 0.00')
+            await self.stream.command(b'conf set servo.pid_position.kd 0.05')
+            await self.stream.command(b'conf set servo.max_slip 20.0')
+        if self.mode == "torque":
+            await self.stream.command(b'conf set servo.voltage_mode_control 0.00')
+            await self.stream.command(b'conf set servo.pid_position.kp 0.00')
+            await self.stream.command(b'conf set servo.pid_position.ki 0.00')
+            await self.stream.command(b'conf set servo.pid_position.kd 0.00')
+        if self.mode == "voltage":
+            await self.stream.command(b'conf set servo.voltage_mode_control 1.00')
+            await self.stream.command(b'conf set servo.pid_position.kp 0.02')
+            await self.stream.command(b'conf set servo.pid_position.ki 0.00')
+            await self.stream.command(b'conf set servo.pid_position.kd 0.05')
+            await self.stream.command(b'conf set servo.max_slip 20.0')
+
     async def command_motor(self):
+        if self.mode == "velocity":
+            velocity = self.motor_action["velocity"] + self.motor_action["sinusoidal"]
+            ff = 0
+        if self.mode == "torque":
+            velcocity_error = self.motor_action["velocity"] - self.motor_velocity
+            self.cumulative_error = self.cumulative_error + velcocity_error
+            ff = self.Kp*velcocity_error +self.Ki*self.cumulative_error + self.motor_action["sinusoidal"]
+            velocity = 0
+        if self.mode == "voltage":
+            velocity = self.motor_action["velocity"]
+            ff = self.motor_action["sinusoidal"]
         motor_telemetry = await self.controller.set_position(
             position=self.motor_action["position"],
-            velocity=self.motor_action["velocity"],
-            feedforward_torque=self.motor_action["feedforward_torque"],
+            velocity=velocity,
+            feedforward_torque=ff,
             maximum_torque=self.motor_action["maximum_torque"],
             stop_position=self.motor_action["stop_position"],
             accel_limit=self.motor_action["accel_limit"],
             query=True)
         self.motor_position = (motor_telemetry.values[moteus.Register.POSITION] % 1)*2*math.pi 
-        return motor_telemetry
+        self.motor_velocity = motor_telemetry.values[moteus.Register.VELOCITY]
+        return motor_telemetry,
     async def stop_motor_driver(self):
         await self.controller.set_stop()
 
@@ -63,7 +105,8 @@ async def constant_velocity_test(motor):
     data = []
     await motor.init_driver()
     await motor.soft_start()
-    
+
+    motor.motor_action["sinusoidal"] = 0
     motor.motor_action["velocity"] = 20
     t0 = time.time()
     t = 0
@@ -80,8 +123,9 @@ async def constant_velocities_test(motor):
     test_name = "logs/constant_velocities/200Hz_bw" + timestr
     data = []
     await motor.init_driver()
-    #await motor.soft_start()
-    
+    await motor.soft_start()
+    motor.motor_action["sinusoidal"] = 0
+
     t0 = time.time()
     t = 0
     while t<10:
@@ -95,7 +139,7 @@ async def constant_velocities_test(motor):
         if t > 8:
             motor.motor_action["velocity"] = 80
         motor_telem = await motor.command_motor()
-        data.append([motor_telem, motor.motor_action["velocity"], t])
+        data.append([motor_telem, motor.motor_action["velocity"], motor.motor_action["sinusoidal"], t])
 
     with open(test_name, 'wb') as f:
         pickle.dump(data, f)
@@ -104,7 +148,7 @@ async def debug(motor):
     while(True):
         await motor.command_motor()
         print(motor.motor_position)
-        #print(telem.values[moteus.Register.POSITION])
+        print(motor.motor_velocity)
 async def sinusoidal_test(motor):
     timestr = datetime.now().strftime("%Y-%d-%m_%H-%M-%S")
     test_name = "logs/sinusoidal_test_hinged_prop_" + timestr
@@ -123,10 +167,11 @@ async def sinusoidal_test(motor):
         t = time.time() - t0
 
         sine_wave = amplitude*math.cos(motor.motor_position+angle)
-        motor.motor_action["velocity"] = base_frequency + sine_wave
+        motor.motor_action["velocity"] = base_frequency
+        motor.motor_action["sinusoidal"] = sine_wave
         motor_telem = await motor.command_motor()
  
-        data.append([motor_telem, motor.motor_action["velocity"], t, angle])
+        data.append([motor_telem, motor.motor_action["velocity"], motor.motor_action["sinusoidal"], t, angle])
     with open(test_name, 'wb') as f:
         pickle.dump(data, f)
 
@@ -158,10 +203,11 @@ async def sinusoidal_multi_test_amplitude(motor):
             amplitude = 0.25*base_frequency
 
         sine_wave = amplitude*math.cos(motor.motor_position+angle)
-        motor.motor_action["velocity"] = base_frequency + sine_wave
+        motor.motor_action["velocity"] = base_frequency
+        motor.motor_action["sinusoidal"] = sine_wave
         motor_telem = await motor.command_motor()
  
-        data.append([motor_telem, motor.motor_action["velocity"], t, angle])
+        data.append([motor_telem, motor.motor_action["velocity"], motor.motor_action["sinusoidal"], t, angle])
     with open(test_name, 'wb') as f:
         pickle.dump(data, f)
 
@@ -195,10 +241,11 @@ async def sinusoidal_multi_test_angle(motor):
             angle = 0
 
         sine_wave = amplitude*math.cos(motor.motor_position+angle)
-        motor.motor_action["velocity"] = base_frequency + sine_wave
+        motor.motor_action["velocity"] = base_frequency
+        motor.motor_action["sinusoidal"] = sine_wave
         motor_telem = await motor.command_motor()
  
-        data.append([motor_telem, motor.motor_action["velocity"], t, angle])
+        data.append([motor_telem, motor.motor_action["velocity"], motor.motor_action["sinusoidal"], t, angle])
     with open(test_name, 'wb') as f:
         pickle.dump(data, f)
 
@@ -223,10 +270,11 @@ async def sinusoidal_test_angle_sweep(motor):
         spin_velocity = spin_start + (spin_end-spin_start)*(t/5)
         angle = (t/5)*2*math.pi*spin_velocity
         sine_wave = amplitude*math.cos(motor.motor_position+angle)
-        motor.motor_action["velocity"] = base_frequency + sine_wave
+        motor.motor_action["velocity"] = base_frequency
+        motor.motor_action["sinusoidal"] = sine_wave
         motor_telem = await motor.command_motor()
  
-        data.append([motor_telem, motor.motor_action["velocity"], t, angle])
+        data.append([motor_telem, motor.motor_action["velocity"], motor.motor_action["sinusoidal"], t, angle])
     with open(test_name, 'wb') as f:
         pickle.dump(data, f)
 async def sinusoidal_test_velocity_sweep(motor):
@@ -249,10 +297,11 @@ async def sinusoidal_test_velocity_sweep(motor):
         frequency = start_frequency + (end_frequency-start_frequency)*(t/end_time)
         amplitude = 0.2*frequency
         sine_wave = amplitude*math.cos(motor.motor_position+angle)
-        motor.motor_action["velocity"] = frequency + sine_wave
+        motor.motor_action["velocity"] = frequency
+        motor.motor_action["sinusoidal"] = sine_wave
         motor_telem = await motor.command_motor()
  
-        data.append([motor_telem, motor.motor_action["velocity"], t, angle])
+        data.append([motor_telem, motor.motor_action["velocity"], motor.motor_action["sinusoidal"], t, angle])
     with open(test_name, 'wb') as f:
         pickle.dump(data, f)
 async def sinusoidal_torque_test(motor):
