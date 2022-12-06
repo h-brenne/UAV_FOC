@@ -13,22 +13,23 @@ plt.rcParams["figure.figsize"] = (10,5)
 
 save_plot = False
 plot_angles = True
-plot_force_sensor = True
-plot_imu = True
-plot_fft = True
-plot_stft = True
+plot_force_sensor = False
+plot_imu = False
+plot_fft = False
+plot_stft = False
 
 title = "Velocity sweep for 60rpm to 3600 rpm, 20% sinusoidal amplitude"
-folder = "logs/sinusoidal_multi_amplitude/60/"
-time_str = "2022-22-11_22-13-48"
-start_time = datetime.strptime(time_str, "%Y-%d-%m_%H-%M-%S")
+folder = "logs/sinusoidal_multi_amplitude/40/"
+time_str = "2022-22-11_22-05-09"
+
 experiment_length = 10
 
 with open(folder + time_str, "rb") as f:
     data = pickle.load(f)
 if plot_force_sensor:
+    start_time = datetime.strptime(time_str, "%Y-%d-%m_%H-%M-%S")
     data_hz = 2000
-    force_df = pd.read_csv(folder + "multi_amplitude60.csv")
+    force_df = pd.read_csv(folder + "multi_amplitude40.csv")
     force_start_time = datetime.strptime(
         force_df.columns[-1][-19:], "%d/%m/%Y %H:%M:%S")
     force_offset = (start_time-force_start_time).total_seconds() + 1.1
@@ -71,7 +72,7 @@ print("Mean update rate: ", 1/np.diff(timesteps).mean())
 
 velocities = [60*x[0].values[moteus.Register.VELOCITY] for x in data]
 torques = [x[0].values[moteus.Register.TORQUE] for x in data]
-#positions = [(x[0].values[moteus.Register.POSITION]%1) for x in data]
+motor_angle = [(x[0].values[moteus.Register.POSITION]%1)*360 for x in data]
 velocity_setpoints = [60*x[1] for x in data]
 currents = [x[0].values[moteus.Register.Q_CURRENT] + x[0].values[moteus.Register.D_CURRENT] for x in data]
 temperatures = [x[0].values[moteus.Register.TEMPERATURE] for x in data]
@@ -161,7 +162,28 @@ if plot_stft:
     fig.colorbar(cax).set_label('Intensity [dB]')
     plt.xlabel("Seconds")
     plt.ylabel("Frequency")
-    
+
+## Scatter plot of velocity tracking
+start_time = 13
+end_time = 15
+base_velocity = 60*60
+amplitude = 0.2*60
+angle = 0
+
+motor_pos = np.linspace(0,2*np.pi, 20)
+vel_setpoint = base_velocity + 60*amplitude*np.cos(motor_pos+angle)
+
+plt.figure()
+plt.title("Velocities vs hub angle psi")
+start_index = (np.abs(timesteps - start_time)).argmin()
+end_index = idx = (np.abs(timesteps - end_time)).argmin()
+#plt.plot(motor_pos*360-180, vel_setpoint)
+
+plt.scatter(motor_angle[start_index:end_index], velocities[start_index:end_index], label="Velocity")
+plt.scatter(motor_angle[start_index:end_index], velocity_setpoints[start_index:end_index], label="Velocity setpoint")
+plt.xlabel("Hub angle [deg]")
+plt.ylabel("RPM")
+plt.legend()
 if save_plot:
     pdf = matplotlib.backends.backend_pdf.PdfPages(folder + "output.pdf")
     for i in plt.get_fignums():
@@ -169,3 +191,4 @@ if save_plot:
         pdf.savefig(plt.figure(i))
     pdf.close()
 plt.show()
+
