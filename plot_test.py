@@ -11,16 +11,17 @@ import matplotlib.backends.backend_pdf
 
 plt.rcParams["figure.figsize"] = (10,5)
 
+old_index = False
 save_plot = False
-plot_angles = True
+plot_angles = False
 plot_force_sensor = False
 plot_imu = False
 plot_fft = False
 plot_stft = False
 
 title = "Velocity sweep for 60rpm to 3600 rpm, 20% sinusoidal amplitude"
-folder = "logs/sinusoidal_multi_amplitude/40/"
-time_str = "2022-22-11_22-05-09"
+folder = "logs/"
+time_str = "sinusoidal_test_hinged_prop_2022-09-12_15-50-57"
 
 experiment_length = 10
 
@@ -67,13 +68,23 @@ if plot_imu:
     if plot_stft:
         imu_stft_f, imu_stft_t, imu_stft_zxx = scipy.signal.stft(df_imu["GyroX"].to_numpy(), imu_data_hz, nperseg=1600)
 
-timesteps = np.asarray([x[2] for x in data])
+if old_index:
+    timesteps = np.asarray([x[2] for x in data])
+else:
+    timesteps = np.asarray([x[3] for x in data])
 print("Mean update rate: ", 1/np.diff(timesteps).mean())
 
+#print([type(x[0][1]) for x in data])
 velocities = [60*x[0].values[moteus.Register.VELOCITY] for x in data]
 torques = [x[0].values[moteus.Register.TORQUE] for x in data]
-motor_angle = [(x[0].values[moteus.Register.POSITION]%1)*360 for x in data]
-velocity_setpoints = [60*x[1] for x in data]
+if old_index:
+    motor_angle = [(x[0].values[moteus.Register.POSITION]%1)*360 for x in data]
+else:
+    motor_angle = [x[5] for x in data]
+if old_index:
+    velocity_setpoints = [60*x[1] for x in data]
+else:
+    velocity_setpoints = [60*x[2] for x in data]
 currents = [x[0].values[moteus.Register.Q_CURRENT] + x[0].values[moteus.Register.D_CURRENT] for x in data]
 temperatures = [x[0].values[moteus.Register.TEMPERATURE] for x in data]
 if plot_angles:
@@ -164,8 +175,8 @@ if plot_stft:
     plt.ylabel("Frequency")
 
 ## Scatter plot of velocity tracking
-start_time = 13
-end_time = 15
+start_time = 1
+end_time = 3
 base_velocity = 60*60
 amplitude = 0.2*60
 angle = 0
@@ -179,7 +190,7 @@ start_index = (np.abs(timesteps - start_time)).argmin()
 end_index = idx = (np.abs(timesteps - end_time)).argmin()
 #plt.plot(motor_pos*360-180, vel_setpoint)
 
-plt.scatter(motor_angle[start_index:end_index], velocities[start_index:end_index], label="Velocity")
+#plt.scatter(motor_angle[start_index:end_index], velocities[start_index:end_index], label="Velocity")
 plt.scatter(motor_angle[start_index:end_index], velocity_setpoints[start_index:end_index], label="Velocity setpoint")
 plt.xlabel("Hub angle [deg]")
 plt.ylabel("RPM")
