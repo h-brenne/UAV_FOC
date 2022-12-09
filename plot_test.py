@@ -76,6 +76,7 @@ print("Mean update rate: ", 1/np.diff(timesteps).mean())
 
 #print([type(x[0][1]) for x in data])
 velocities = [60*x[0].values[moteus.Register.VELOCITY] for x in data]
+accelerations = np.gradient(velocities)
 torques = [x[0].values[moteus.Register.TORQUE] for x in data]
 if old_index:
     motor_angle = [(x[0].values[moteus.Register.POSITION]%1)*360 for x in data]
@@ -184,16 +185,22 @@ angle = 0
 motor_pos = np.linspace(0,2*np.pi, 20)
 vel_setpoint = base_velocity + 60*amplitude*np.cos(motor_pos+angle)
 
-plt.figure()
+fig,ax = plt.subplots()
+
 plt.title("Velocities vs hub angle psi")
 start_index = (np.abs(timesteps - start_time)).argmin()
 end_index = idx = (np.abs(timesteps - end_time)).argmin()
 #plt.plot(motor_pos*360-180, vel_setpoint)
 
-#plt.scatter(motor_angle[start_index:end_index], velocities[start_index:end_index], label="Velocity")
-plt.scatter(motor_angle[start_index:end_index], velocity_setpoints[start_index:end_index], label="Velocity setpoint")
+ax.scatter(motor_angle[start_index:end_index], velocities[start_index:end_index], label="Velocity")
+ax.scatter(motor_angle[start_index:end_index], velocity_setpoints[start_index:end_index], label="Velocity setpoint")
 plt.xlabel("Hub angle [deg]")
 plt.ylabel("RPM")
+plt.legend()
+ax2 = ax.twinx()
+ax2.scatter(motor_angle[start_index:end_index], accelerations[start_index:end_index], label="Acceleration", color="green")
+plt.ylabel("rpm^2")
+
 plt.legend()
 if save_plot:
     pdf = matplotlib.backends.backend_pdf.PdfPages(folder + "output.pdf")
