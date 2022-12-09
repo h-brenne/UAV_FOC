@@ -1,6 +1,7 @@
 import pickle
 import math
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 import pandas as pd
 import moteus
@@ -9,21 +10,32 @@ from scipy import signal
 from datetime import datetime
 import matplotlib.backends.backend_pdf
 
-plt.rcParams["figure.figsize"] = (10,5)
+plt.rcParams["figure.figsize"] = (10,7)
+params = {'text.usetex' : True,
+                    'font.size' : 18,
+                    }
+plt.rcParams.update(params)
+plt.rc('font', family='serif')
 
-old_index = False
-save_plot = False
-plot_angles = False
-plot_force_sensor = False
-plot_imu = False
-plot_fft = False
-plot_stft = False
+save_pgf = True
+if save_pgf:
+    matplotlib.use('pgf')
+
+
+old_index = True
+speed_radians = True
+save_plot = True
+plot_angles = True
+plot_force_sensor = True
+plot_imu = True
+plot_fft = True
+plot_stft = True
 
 title = "Velocity sweep for 60rpm to 3600 rpm, 20% sinusoidal amplitude"
-folder = "logs/"
-time_str = "sinusoidal_test_hinged_prop_2022-09-12_15-50-57"
+folder = "logs/sinusoidal_multi_amplitude/40/"
+time_str = "2022-22-11_22-05-09"
 
-experiment_length = 10
+experiment_length = 24
 
 with open(folder + time_str, "rb") as f:
     data = pickle.load(f)
@@ -68,28 +80,33 @@ if plot_imu:
     if plot_stft:
         imu_stft_f, imu_stft_t, imu_stft_zxx = scipy.signal.stft(df_imu["GyroX"].to_numpy(), imu_data_hz, nperseg=1600)
 
-if old_index:
-    timesteps = np.asarray([x[2] for x in data])
-else:
-    timesteps = np.asarray([x[3] for x in data])
-print("Mean update rate: ", 1/np.diff(timesteps).mean())
-
-#print([type(x[0][1]) for x in data])
-velocities = [60*x[0].values[moteus.Register.VELOCITY] for x in data]
-accelerations = np.gradient(velocities)
+velocities = [2*math.pi*x[0].values[moteus.Register.VELOCITY] for x in data]
 torques = [x[0].values[moteus.Register.TORQUE] for x in data]
-if old_index:
-    motor_angle = [(x[0].values[moteus.Register.POSITION]%1)*360 for x in data]
-else:
-    motor_angle = [x[5] for x in data]
-if old_index:
-    velocity_setpoints = [60*x[1] for x in data]
-else:
-    velocity_setpoints = [60*x[2] for x in data]
 currents = [x[0].values[moteus.Register.Q_CURRENT] + x[0].values[moteus.Register.D_CURRENT] for x in data]
 temperatures = [x[0].values[moteus.Register.TEMPERATURE] for x in data]
+motor_angle = [(x[0].values[moteus.Register.POSITION]%1)*360 for x in data]
+
+if old_index:
+    # data[0] is shifted one index to the right
+    timesteps = np.asarray([x[2] for x in data])
+    timesteps = timesteps[:-1]
+    velocity_setpoints = [2*math.pi*x[1] for x in data]
+    velocity_setpoints.pop(0)
+    velocities.pop()
+    torques.pop()
+    currents.pop()
+    temperatures.pop()
+    motor_angle.pop()
+    
+else:
+    timesteps = np.asarray([x[3] for x in data])
+    velocity_setpoints = [2*math.pi*x[1] + 60*x[2] for x in data]
 if plot_angles:
     angles = [x[3]*180/math.pi for x in data]
+    if old_index:
+        angles.pop(0)
+print("Mean update rate: ", 1/np.diff(timesteps).mean())
+accelerations = np.gradient(velocities)
 
 num_plots = 2
 plt.subplot(num_plots,1,1)
@@ -165,7 +182,7 @@ if plot_stft:
     _,_,_,cax = plt.specgram(sum_of_imu_accel, NFFT=800, Fs=imu_data_hz)
     fig.colorbar(cax).set_label('Intensity [dB]')
     plt.xlabel("Seconds")
-    plt.ylabel("Frequency")
+    plt.ylabel("Frequency [Hz]")
     fig = plt.figure()
     plt.title("Spectogram of sum of x,y,z forces")
     #ax = fig.gca(projection='3d')
@@ -176,8 +193,8 @@ if plot_stft:
     plt.ylabel("Frequency")
 
 ## Scatter plot of velocity tracking
-start_time = 1
-end_time = 3
+start_time = 12.1
+end_time = 15.9
 base_velocity = 60*60
 amplitude = 0.2*60
 angle = 0
@@ -187,26 +204,32 @@ vel_setpoint = base_velocity + 60*amplitude*np.cos(motor_pos+angle)
 
 fig,ax = plt.subplots()
 
-plt.title("Velocities vs hub angle psi")
+plt.title("Velocity tracking vs hub angle $\psi$")
 start_index = (np.abs(timesteps - start_time)).argmin()
 end_index = idx = (np.abs(timesteps - end_time)).argmin()
 #plt.plot(motor_pos*360-180, vel_setpoint)
 
-ax.scatter(motor_angle[start_index:end_index], velocities[start_index:end_index], label="Velocity")
+ax.scatter(motor_angle[start_index:end_index], velocities[start_index:end_index], label="Velocity $\omega$")
 ax.scatter(motor_angle[start_index:end_index], velocity_setpoints[start_index:end_index], label="Velocity setpoint")
-plt.xlabel("Hub angle [deg]")
-plt.ylabel("RPM")
+ax.tick_params(axis ='y', labelcolor = 'C0') 
+plt.xlabel("$\psi$ [deg]")
+plt.ylabel("rad/s", color="C0")
 plt.legend()
 ax2 = ax.twinx()
-ax2.scatter(motor_angle[start_index:end_index], accelerations[start_index:end_index], label="Acceleration", color="green")
-plt.ylabel("rpm^2")
+ax2.scatter(motor_angle[start_index:end_index], accelerations[start_index:end_index], label="Acceleration $\dot\omega$", color="C2")
+ax2.tick_params(axis ='y', labelcolor = 'C2')
+plt.ylabel("$rad/s^2$", color = "C2")
 
 plt.legend()
 if save_plot:
     pdf = matplotlib.backends.backend_pdf.PdfPages(folder + "output.pdf")
     for i in plt.get_fignums():
-        plt.figure(i).savefig(folder + str(i) + '.png')
-        pdf.savefig(plt.figure(i))
-    pdf.close()
-plt.show()
+        if save_pgf:
+            plt.figure(i).savefig(folder + str(i) + '.pgf')
+        else:
+            plt.figure(i).savefig(folder + str(i) + '.png')
+            pdf.savefig(plt.figure(i))
+            pdf.close()
+if not save_pgf:
+    plt.show()
 
