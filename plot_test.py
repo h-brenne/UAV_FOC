@@ -14,7 +14,7 @@ from get_input import get_amplitudes
 
 plt.rcParams["figure.figsize"] = (10,7)
 params = {'text.usetex' : True,
-                    'font.size' : 20,
+                    'font.size' : 22,
                     }
 plt.rcParams.update(params)
 plt.rc('font', family='serif')
@@ -38,11 +38,11 @@ title = "$\\tilde \Omega$ amplitude steps, $\Omega = 60 (2 \pi)$"
 #folder = "logs/sinusoidal_multi_amplitude/20/"
 #time_str = "2022-22-11_22-11-49"
 
-#folder = "logs/sinusoidal_multi_amplitude/40/"
-#time_str = "2022-22-11_22-05-09"
+folder = "logs/sinusoidal_multi_amplitude/40/"
+time_str = "2022-22-11_22-05-09"
 
-folder = "logs/sinusoidal_multi_amplitude/60/"
-time_str = "2022-22-11_22-13-48"
+#folder = "logs/sinusoidal_multi_amplitude/60/"
+#time_str = "2022-22-11_22-13-48"
 #folder = "logs/sinusoidal_torque/1/"
 #time_str = "2022-22-11_19-57-08"
 
@@ -54,7 +54,7 @@ with open(folder + time_str, "rb") as f:
 if plot_force_sensor:
     start_time = datetime.strptime(time_str, "%Y-%d-%m_%H-%M-%S")
     data_hz = 2000
-    force_df = pd.read_csv(folder + "multi_amplitude60.csv")
+    force_df = pd.read_csv(folder + "multi_amplitude40.csv")
     force_df["Force X (N)"] = -force_df["Force X (N)"]
     force_df["Force Y (N)"] = -force_df["Force Y (N)"]
     force_start_time = datetime.strptime(
@@ -336,6 +336,15 @@ ax.text(0.74, 0.97, '3', fontsize=22, transform=ax.transAxes,
         verticalalignment='top', bbox=dict(boxstyle='square', facecolor='wheat', alpha=0.5))
 plt.legend(loc='lower right')
 
+
+### IMU FFT
+plt.figure(figsize=(6,4))
+plt.magnitude_spectrum(sum_of_imu_accel_section, imu_data_hz, scale='dB')
+#plt.plot(imu_freq_timesteps, np.abs(imu_fft), label="FFT of sum of IMU x,y,z accelerations")
+#plt.xticks(np.arange(0, 400, 60))
+plt.xticks(np.arange(0, 400, 40))
+plt.ylim(-80,40)
+plt.grid(axis = 'x')
 
 plt.tight_layout()
 if save_plot:
