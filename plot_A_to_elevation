@@ -14,7 +14,7 @@ from get_input import get_amplitudes
 
 plt.rcParams["figure.figsize"] = (10,7)
 params = {'text.usetex' : True,
-                    'font.size' : 14,
+                    'font.size' : 24,
                     }
 plt.rcParams.update(params)
 plt.rc('font', family='serif')
@@ -117,77 +117,55 @@ print("Mean update rate: ", 1/np.diff(timesteps).mean())
 accelerations = np.gradient(velocities)
 
 ###For amplitude sweeps
-amplitudes = get_amplitudes(timesteps)
+amplitudes = [0,5,10,15,20,25]
+amplitudes = np.asarray(amplitudes)
+## Get average angles
+
+force_elevation_angles = []
+for i in range(6):
+    end_time = 4*(i+1)-1
+    start_time =4*(i)+1
+    end_index = (np.abs(force_timesteps - end_time)).argmin()
+    start_index = (np.abs(force_timesteps - start_time)).argmin()
+    force_elevation_angles.append(np.average(thrust_theta_angle[start_index:end_index]))
+## Best fit line thrust
+thrust_a, thrust_b = np.polyfit(amplitudes, force_elevation_angles, 1)
+thrust_a2, thrust_b2 = np.polyfit(amplitudes[1:], force_elevation_angles[1:], 1)
+
+## Camera measured angles
+camera_elevation = np.asarray([0, 3.6, 6.3, 8.5, 14.6, 18.4])
+## Best fit line camera
+camera_a, camera_b = np.polyfit(amplitudes, camera_elevation, 1)
 
 
-fig = plt.figure(figsize=(10, 15))
-plt.subplot(5,1,1)
-plt.title(title)
-plt.plot(timesteps, amplitudes*100, label="($A/\Omega)\\times 100$", linewidth="3")
-#plt.xlabel("seconds")
-plt.ylabel("Percentage")
-plt.xlim(0,experiment_length)
-plt.xticks(np.arange(0, experiment_length+sub_experiment_length, sub_experiment_length))
-plt.yticks(np.arange(0, 30, 5))
-plt.grid()
-plt.legend()
 
-plt.subplot(5,1,2)
-#plt.title(title)
-plt.plot(force_timesteps, force_magnitude, label="Thrust magnitude $T$", linewidth = "3")
-plt.plot(force_timesteps, force_df_smooth["Force X (N)"], label="Force X (N)")
-plt.plot(force_timesteps, force_df_smooth["Force Y (N)"], label="Force Y (N)")
-plt.plot(force_timesteps, force_df_smooth["Force Z (N)"], label="Force Z (N)")
-plt.ylabel("Force [N]")
-plt.xticks(np.arange(0, experiment_length+sub_experiment_length, sub_experiment_length))
-#plt.xlabel("Seconds")
-plt.legend()
-plt.xlim(0,experiment_length)
-plt.grid()
-plt.subplot(5,1,3)
-plt.plot(force_timesteps, force_df_smooth["Torque X (N-m)"], label="Torque X (N-m)")
-plt.plot(force_timesteps, force_df_smooth["Torque Y (N-m)"], label="Torque Y (N-m)")
-plt.plot(force_timesteps, force_df_smooth["Torque Z (N-m)"], label="Torque Z (N-m)")
-plt.ylabel("Torque [Nm]")
-#plt.xlabel("Seconds")
-plt.legend()
-plt.xlim(0,experiment_length)
-plt.xticks(np.arange(0, experiment_length+sub_experiment_length, sub_experiment_length))
+plt.figure()
+plt.scatter(amplitudes, force_elevation_angles, label="Force sensor measured angle, $\Omega = 60$Hz")
+plt.plot(amplitudes, thrust_a*amplitudes+thrust_b, label="Best fit line")
+plt.scatter(amplitudes, camera_elevation, label="Camera measured angle, $\Omega = 20$Hz")
+plt.plot(amplitudes, camera_a*amplitudes+camera_b, label="Best fit line")
+#plt.plot(amplitudes, thrust_a2*amplitudes+thrust_b2, label="Best fit line")
+plt.xlabel("$A$ as percentage of $\Omega$")
+plt.ylabel("Thrust vector elevation [deg]")
+plt.legend(fontsize=19)
 plt.grid()
 
-###### Plot angles from force sensor 
-plt.subplot(5,1,4)
-#plt.title(title)
-plt.ylabel("Angle [deg]")
-
-plt.plot(force_timesteps, thrust_theta_angle, label="Thrust vector elevation $\\beta_c$")
+plt.figure()
+plt.scatter(amplitudes, camera_elevation, label="Camera measured angles $\Omega = 20$Hz")
+plt.plot(amplitudes, camera_a*amplitudes+camera_b, label="Best fit line")
+#plt.plot(amplitudes, thrust_a2*amplitudes+thrust_b2, label="Best fit line")
+plt.xlabel("$A$ as percentage of $\Omega$")
+plt.ylabel("Thrust vector elevation [deg]")
 plt.legend()
-plt.xlim(0,experiment_length)
-plt.ylim(0,25)
-plt.yticks(np.arange(0, 30, 5))
-plt.xticks(np.arange(0, experiment_length+sub_experiment_length, sub_experiment_length))
 plt.grid()
-plt.subplot(5,1,5)
-amplitude_start_index = (np.abs(force_timesteps - 4.2)).argmin()
-plt.plot(force_timesteps[amplitude_start_index:], thrust_phi_angle[amplitude_start_index:], label="Thrust vector azimuth $\psi_c$")
-plt.plot(timesteps, angles, label = "$\psi_c^{ref}$")
-plt.ylim(30,150)
-plt.yticks(np.arange(30, 150, 30))
-plt.legend()
-plt.ylabel("Angle [deg]")
-plt.xlabel("seconds")
-plt.xlim(0,experiment_length)
-plt.xticks(np.arange(0, experiment_length+sub_experiment_length, sub_experiment_length))
-plt.grid()
-
 plt.tight_layout()
 if save_plot:
     pdf = matplotlib.backends.backend_pdf.PdfPages(folder + "output.pdf")
     for i in plt.get_fignums():
         if save_pgf:
-            plt.figure(i).savefig(folder + str(i) + '.pdf')
+            plt.figure(i).savefig(folder + str(i) + '_A_to_elevation.pdf')
         else:
-            plt.figure(i).savefig(folder + str(i) + '.pdf')
+            plt.figure(i).savefig(folder + str(i) + '_A_to_elevation.pdf')
             #pdf.savefig(plt.figure(i))
             #pdf.close()
 if not save_pgf:

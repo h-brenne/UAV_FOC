@@ -33,24 +33,25 @@ plot_imu = True
 plot_fft = True
 plot_stft = True
 
-title = "Speed modulation $\\tilde \Omega$ amplitude steps, $\Omega = 60 \\times(2 \pi)$rad/s"
-folder = "logs/sinusoidal_multi_amplitude/60/"
-time_str = "2022-22-11_22-13-48"
+title = "Average speed $\Omega$ increase from 15Hz to 60Hz, $A = 0.2 \\times \Omega$"
+folder = "logs/velocity_sweep/0.2A/"
+time_str = "2022-22-11_22-54-35"
 
-experiment_length = 24
-sub_experiment_length = 4
+experiment_length = 8
+experiment_start = 2
+sub_experiment_length = 2
 
 with open(folder + time_str, "rb") as f:
     data = pickle.load(f)
 if plot_force_sensor:
     start_time = datetime.strptime(time_str, "%Y-%d-%m_%H-%M-%S")
     data_hz = 2000
-    force_df = pd.read_csv(folder + "multi_amplitude60.csv")
+    force_df = pd.read_csv(folder + "velocity_sweep0.2A.csv")
     force_df["Force X (N)"] = -force_df["Force X (N)"]
     force_df["Force Y (N)"] = -force_df["Force Y (N)"]
     force_start_time = datetime.strptime(
         force_df.columns[-1][-19:], "%d/%m/%Y %H:%M:%S")
-    force_offset = (start_time-force_start_time).total_seconds() + 1.1
+    force_offset = (start_time-force_start_time).total_seconds() + 0.5
     force_df_smooth = force_df.ewm(span = 500).mean()
     num_samples = len(force_df["Torque Z (N-m)"])
     force_timesteps = np.linspace(-force_offset,num_samples/data_hz-force_offset, num_samples)
@@ -117,20 +118,22 @@ print("Mean update rate: ", 1/np.diff(timesteps).mean())
 accelerations = np.gradient(velocities)
 
 ###For amplitude sweeps
-amplitudes = get_amplitudes(timesteps)
+average_vel_setpoint = np.linspace(10*2*np.pi,60*2*math.pi, len(timesteps))
 
+timesteps = timesteps -2
+force_timesteps = force_timesteps - 2
 
 fig = plt.figure(figsize=(10, 15))
 plt.subplot(5,1,1)
 plt.title(title)
-plt.plot(timesteps, amplitudes*100, label="($A/\Omega)\\times 100$", linewidth="3")
+plt.plot(timesteps, average_vel_setpoint, label="Average speed $\Omega$", linewidth="3")
 #plt.xlabel("seconds")
-plt.ylabel("Percentage")
-plt.xlim(0,experiment_length)
+plt.ylabel("rad/s")
+plt.xlim(experiment_start,experiment_length)
 plt.xticks(np.arange(0, experiment_length+sub_experiment_length, sub_experiment_length))
-plt.yticks(np.arange(0, 30, 5))
-plt.grid()
+plt.yticks(np.arange(50, 450, 100))
 plt.legend()
+plt.grid()
 
 plt.subplot(5,1,2)
 #plt.title(title)
@@ -142,8 +145,8 @@ plt.ylabel("Force [N]")
 plt.xticks(np.arange(0, experiment_length+sub_experiment_length, sub_experiment_length))
 #plt.xlabel("Seconds")
 plt.legend()
-plt.xlim(0,experiment_length)
 plt.grid()
+plt.xlim(0,experiment_length)
 plt.subplot(5,1,3)
 plt.plot(force_timesteps, force_df_smooth["Torque X (N-m)"], label="Torque X (N-m)")
 plt.plot(force_timesteps, force_df_smooth["Torque Y (N-m)"], label="Torque Y (N-m)")
@@ -168,11 +171,11 @@ plt.yticks(np.arange(0, 30, 5))
 plt.xticks(np.arange(0, experiment_length+sub_experiment_length, sub_experiment_length))
 plt.grid()
 plt.subplot(5,1,5)
-amplitude_start_index = (np.abs(force_timesteps - 4.2)).argmin()
+amplitude_start_index = 0
 plt.plot(force_timesteps[amplitude_start_index:], thrust_phi_angle[amplitude_start_index:], label="Thrust vector azimuth $\psi_c$")
 plt.plot(timesteps, angles, label = "$\psi_c^{ref}$")
-plt.ylim(30,150)
-plt.yticks(np.arange(30, 150, 30))
+plt.ylim(60,120)
+plt.yticks(np.arange(30, 120, 30))
 plt.legend()
 plt.ylabel("Angle [deg]")
 plt.xlabel("seconds")
